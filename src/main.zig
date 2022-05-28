@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @import("c.zig").sdl;
+const c = @import("c.zig");
 
 const WINDOW_WIDTH = 800;
 const WINDOW_HEIGHT = 600;

@@ -1,3 +1,3 @@
-pub const sdl = @cImport({
+usingnamespace @cImport({
     @cInclude("SDL2/SDL.h");
 });
