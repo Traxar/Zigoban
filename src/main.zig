@@ -55,15 +55,16 @@ pub fn main() anyerror!void {
     defer c.SDL_DestroyRenderer(renderer);
     _ = c.SDL_SetRenderDrawBlendMode(renderer, c.SDL_BLENDMODE_BLEND);
     //generate Level
-    var level = try l.Level.generate(allocator,4,4);
-    defer level.destroy(allocator);
+    var level = try l.Level.generate(allocator,18,12);
+    defer level.destroy();
 
-    var move: ?l.Move = null;
 
     //var mode: Mode = .load;
 
     //main loop
     mainloop: while (true) {
+
+        var move: ?l.Move = null;
         //events
         var sdl_event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&sdl_event) != 0) {
@@ -75,6 +76,8 @@ pub fn main() anyerror!void {
                             c.SDLK_a => move = .left,
                             c.SDLK_s => move = .down,
                             c.SDLK_d => move = .right,
+                            c.SDLK_u => level.undo(),
+                            c.SDLK_r => level.reset(),
                             else => {}
                         }
                     },
@@ -82,7 +85,8 @@ pub fn main() anyerror!void {
             }
         }
         //game logic
-
+        if (move!=null)
+            try level.do(move.?);
         //render
         _ = c.SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff);
         _ = c.SDL_RenderClear(renderer);
@@ -94,6 +98,7 @@ pub fn main() anyerror!void {
         // _ = c.SDL_RenderFillRect(renderer, &rect);
 
         c.SDL_RenderPresent(renderer);
+        c.SDL_Delay(16);
     }
 }
 

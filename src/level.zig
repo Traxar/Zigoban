@@ -39,47 +39,128 @@ const Tile = struct{
     }
 };
 
+const State = struct{
+    tile: []Tile,
+    prev: ?*State=null,
+
+    fn next(self: *State, allocator: std.mem.Allocator) !*State{
+        var state = try allocator.create(State);
+        state.tile = try allocator.alloc(Tile,self.tile.len);
+        state.prev = self;
+        for (state.tile) |_,i|{
+            state.tile[i]=self.tile[i];
+        }
+        return state;
+    }
+
+    fn undo(self: *State, allocator: std.mem.Allocator) *State{
+        if (self.prev == null)
+            return self;
+        allocator.free(self.tile);
+        defer allocator.destroy(self);
+        return self.prev.?;
+    }
+
+    fn reset(self: *State, allocator: std.mem.Allocator) *State{
+        var ptr = self;
+        while (ptr.prev != null){
+            ptr = ptr.undo(allocator);
+        }
+        return ptr;
+    }
+
+    fn destroy(self: *State, allocator: std.mem.Allocator) void{
+        var ptr = self.reset(allocator);
+        allocator.free(ptr.tile);
+        allocator.destroy(ptr);
+    }
+
+    fn isEqual(self: *State, other: *State) bool{
+        //if (self.tile.len!=other.tile.len) return false;
+        for (self.tile) |_,i|{
+            if (self.tile[i]!=other.tile[i]) return false;
+        }
+        return true;
+    }
+
+};
+
 pub const Level = struct{
     sizeX: u8,
     sizeY: u8,
-    tile: []Tile,
-    prev: ?*Level=null,
+    state: *State,
+    allocator: std.mem.Allocator,
 
 
     fn at(self: *Level, x: u8, y: u8) ?*Tile{
         if (x<0 or y<0 or x>=self.sizeX or y>=self.sizeY){
             return null;
         }
-        return &self.tile[x+self.sizeX*y];
+        return &self.state.tile[x+self.sizeX*y];
     }
 
     pub fn generate(allocator: std.mem.Allocator, sizeX: u8, sizeY: u8) !Level{
-        var tile = try allocator.alloc(Tile, sizeX*@intCast(u16,sizeY));
-        for (tile) |_,i|{
+        var state = try allocator.create(State);
+        state.tile = try allocator.alloc(Tile, sizeX*@intCast(u16,sizeY));
+        state.prev = null;
+        for (state.tile) |_,i|{
             if (i%5==0){
-                tile[i].object = .wall;
-                tile[i].floor = .none;
+                state.tile[i].object = .wall;
+                state.tile[i].floor = .none;
             }
             else{
-                tile[i].object = .none;
-                tile[i].floor = .none;
+                state.tile[i].object = .none;
+                state.tile[i].floor = .none;
             }
         }
-        tile[0].object = .player;
+        state.tile[0].object = .player;
         return Level{
             .sizeX = sizeX,
             .sizeY = sizeY,
-            .tile = tile
+            .state = state,
+            .allocator = allocator,
         };
     }
 
-    pub fn destroy(self: *Level, allocator: std.mem.Allocator) void{
-        allocator.free(self.tile);
+    pub fn destroy(self: *Level) void{
+        self.state.destroy(self.allocator);
+        //self.allocator.free(self.state.tile);
     }
 
-    // pub fn do(self: *Level, move: Move) *Level{
-    //     return self;        
-    // }
+    pub fn do(self: *Level, move: Move) !void {
+        var x: u8 = 0;
+        while (x<self.sizeX):(x+=1){
+            var y: u8 = 0;
+            while (y<self.sizeY):(y+=1){
+                if (self.at(x,y).?.object == .player){
+                    const dx:u8 = switch (move){
+                        .left => x-|1,
+                        .right => x+|1,
+                        else => x
+                    };
+                    const dy:u8 = switch (move){
+                        .up => y-|1,
+                        .down => y+|1,
+                        else => y
+                    };
+                    if (self.at(dx,dy)!=null and self.at(dx,dy).?.object!=.wall){
+                        self.state = try self.state.next(self.allocator);
+                        self.at(x,y).?.object = .none;
+                        self.at(dx,dy).?.object = .player;
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    pub fn undo(self: *Level) void {
+        self.state = self.state.undo(self.allocator);
+    }
+
+    pub fn reset(self: *Level) void {
+        self.state = self.state.reset(self.allocator);
+    }
 
     pub fn render(self: *Level,renderer: *c.SDL_Renderer, width: u32, height: u32) void {
         const size = @minimum(
