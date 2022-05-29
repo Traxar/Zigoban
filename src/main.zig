@@ -84,18 +84,18 @@ pub fn main() anyerror!void {
                 else => {}
             }
         }
+        
         //game logic
-        if (move!=null)
+        if (move!=null){
             try level.do(move.?);
+        }
+
         //render
         _ = c.SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff);
         _ = c.SDL_RenderClear(renderer);
         
         level.render(renderer,WINDOW_WIDTH,WINDOW_HEIGHT);
 
-        // var rect = c.SDL_Rect{ .x = 50*@intCast(c_int,x), .y = 50*@intCast(c_int,y), .w = 50, .h = 50 };
-        // _ = c.SDL_SetRenderDrawColor(renderer, 0xaa, 0xaa, 0xaa, 0xff);
-        // _ = c.SDL_RenderFillRect(renderer, &rect);
 
         c.SDL_RenderPresent(renderer);
         c.SDL_Delay(16);

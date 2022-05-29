@@ -37,6 +37,10 @@ const Tile = struct{
             .wall => return 0x666666ff
         }
     }
+
+    fn isEqual(self: *Tile, other: *Tile) bool{
+        return self.object == other.object and self.floor == other.floor;
+    }
 };
 
 const State = struct{
@@ -78,7 +82,8 @@ const State = struct{
     fn isEqual(self: *State, other: *State) bool{
         //if (self.tile.len!=other.tile.len) return false;
         for (self.tile) |_,i|{
-            if (self.tile[i]!=other.tile[i]) return false;
+            if (!self.tile[i].isEqual(&other.tile[i])) 
+                return false;
         }
         return true;
     }
@@ -93,7 +98,7 @@ pub const Level = struct{
 
 
     fn at(self: *Level, x: u8, y: u8) ?*Tile{
-        if (x<0 or y<0 or x>=self.sizeX or y>=self.sizeY){
+        if (x>=self.sizeX or y>=self.sizeY){
             return null;
         }
         return &self.state.tile[x+self.sizeX*y];
@@ -114,6 +119,7 @@ pub const Level = struct{
             }
         }
         state.tile[0].object = .player;
+        state.tile[10].object = .player;
         return Level{
             .sizeX = sizeX,
             .sizeY = sizeY,
@@ -128,30 +134,36 @@ pub const Level = struct{
     }
 
     pub fn do(self: *Level, move: Move) !void {
+        var next = try self.state.next(self.allocator);
         var x: u8 = 0;
         while (x<self.sizeX):(x+=1){
             var y: u8 = 0;
             while (y<self.sizeY):(y+=1){
                 if (self.at(x,y).?.object == .player){
                     const dx:u8 = switch (move){
-                        .left => x-|1,
-                        .right => x+|1,
+                        .left => x-%1,
+                        .right => x+%1,
                         else => x
                     };
                     const dy:u8 = switch (move){
-                        .up => y-|1,
-                        .down => y+|1,
+                        .up => y-%1,
+                        .down => y+%1,
                         else => y
                     };
                     if (self.at(dx,dy)!=null and self.at(dx,dy).?.object!=.wall){
-                        self.state = try self.state.next(self.allocator);
-                        self.at(x,y).?.object = .none;
-                        self.at(dx,dy).?.object = .player;
+                        next.tile[x+self.sizeX*y].object = .none;
+                        next.tile[dx+self.sizeX*dy].object = .player;
                     }
-                    return;
                 }
             }
         }
+        if (!self.state.isEqual(next)){
+            self.state = next;
+        }
+        else{
+            _ = next.undo(self.allocator);
+        }
+        return;
     }
 
     pub fn undo(self: *Level) void {
