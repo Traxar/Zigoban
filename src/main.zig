@@ -1,20 +1,10 @@
 const std = @import("std");
 const c = @import("c.zig");
 const l = @import("level.zig");
-
-const Mode = enum{
-    load,
-    play,
-    stats,
-    settings
-};
+const levels = @embedFile("levels.txt");
 
 const WINDOW_WIDTH = 900;
 const WINDOW_HEIGHT = 600;
-
-
-var x: u3 = 1;
-var y: u3 = 1;
 
 pub fn main() anyerror!void {
     //Allocator
@@ -55,11 +45,9 @@ pub fn main() anyerror!void {
     defer c.SDL_DestroyRenderer(renderer);
     _ = c.SDL_SetRenderDrawBlendMode(renderer, c.SDL_BLENDMODE_BLEND);
     //generate Level
-    var level = try l.Level.generate(allocator,18,12);
+    var reader = std.mem.tokenize(u8,levels,",;");
+    var level = try l.Level.load(allocator, &reader);
     defer level.destroy();
-
-
-    //var mode: Mode = .load;
 
     //main loop
     mainloop: while (true) {
@@ -84,8 +72,13 @@ pub fn main() anyerror!void {
                 else => {}
             }
         }
-        
+
         //game logic
+        if (level.solved()) {
+            const load = l.Level.load(allocator, &reader) catch break :mainloop;
+            level.destroy();
+            level = load;
+        }
         if (move!=null){
             try level.do(move.?);
         }

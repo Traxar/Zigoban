@@ -17,7 +17,27 @@ pub const Move = enum{
     up,
     down,
     left,
-    right
+    right,
+
+    fn opposite(self: Move) Move{
+        return switch(self){
+            .up => .down,
+            .down => .up,
+            .left => .right,
+            .right => .left,
+        };
+    }
+
+    fn addToVector(self: Move,xy: @Vector(2,u8)) @Vector(2,u8){
+        var v = xy;
+        switch(self){
+            .up => v[1] -%= 1,
+            .down => v[1] +%= 1,
+            .left => v[0] -%= 1,
+            .right => v[0] +%= 1,
+        }
+        return v;
+    }
 };
 
 const Tile = struct{
@@ -29,7 +49,7 @@ const Tile = struct{
             .none => {
                     switch (self.floor){
                         .none => return 0x121212ff,
-                        .plate => return 0x32CD32ff,
+                        .plate => return 0x44aa44ff,
                     }
                 },
             .player => return 0x4F94CDff,
@@ -40,6 +60,11 @@ const Tile = struct{
 
     fn isEqual(self: *Tile, other: *Tile) bool{
         return self.object == other.object and self.floor == other.floor;
+    }
+
+
+    fn pushable(self: *Tile) bool{
+        return self.object==.player or self.object==.box;
     }
 };
 
@@ -96,30 +121,63 @@ pub const Level = struct{
     state: *State,
     allocator: std.mem.Allocator,
 
-
-    fn at(self: *Level, x: u8, y: u8) ?*Tile{
-        if (x>=self.sizeX or y>=self.sizeY){
-            return null;
-        }
-        return &self.state.tile[x+self.sizeX*y];
+    fn index(self: *Level, xy: @Vector(2,u8)) u16{
+        return xy[0]+self.sizeX*@intCast(u16,xy[1]);
     }
 
-    pub fn generate(allocator: std.mem.Allocator, sizeX: u8, sizeY: u8) !Level{
-        var state = try allocator.create(State);
-        state.tile = try allocator.alloc(Tile, sizeX*@intCast(u16,sizeY));
-        state.prev = null;
-        for (state.tile) |_,i|{
-            if (i%5==0){
-                state.tile[i].object = .wall;
-                state.tile[i].floor = .none;
-            }
-            else{
-                state.tile[i].object = .none;
-                state.tile[i].floor = .none;
-            }
+    fn at(self: *Level, xy: @Vector(2,u8)) ?*Tile{
+        if (xy[0]>=self.sizeX or xy[1]>=self.sizeY){
+            return null;
         }
-        state.tile[0].object = .player;
-        state.tile[10].object = .player;
+        return &self.state.tile[self.index(xy)];
+    }
+
+    fn isPushableAt(self: *Level, xy: @Vector(2,u8)) bool{
+        return self.at(xy) != null and self.at(xy).?.pushable();
+    }
+
+    fn isObjectAt(self: *Level, xy: @Vector(2,u8), obj: Object) bool{
+        return self.at(xy) != null and self.at(xy).?.object == obj;
+    }
+
+    pub fn load(allocator: std.mem.Allocator, reader: *std.mem.TokenIterator(u8)) !Level{
+        const sizeX = try std.fmt.parseInt(u8, reader.next() orelse return error.ParseLevel, 10);
+        const sizeY = try std.fmt.parseInt(u8, reader.next() orelse return error.ParseLevel, 10);
+        const data = reader.next() orelse return error.ParseLevel;
+        var state = try allocator.create(State);
+        const size = sizeX*@intCast(u16,sizeY);
+        state.tile = try allocator.alloc(Tile, size);
+        state.prev = null;
+        var i: u16 = 0;
+        for (data) |d|{
+            switch (d){
+                '.' =>{
+                    state.tile[i].object=.none;
+                    state.tile[i].floor=.none;
+                },
+                '_' =>{
+                    state.tile[i].object=.none;
+                    state.tile[i].floor=.plate;
+                },
+                'W' =>{
+                    state.tile[i].object=.wall;
+                    state.tile[i].floor=.none;
+                },
+                'B' =>{
+                    state.tile[i].object=.box;
+                    state.tile[i].floor=.none;
+                },
+                'P' =>{
+                    state.tile[i].object=.player;
+                    state.tile[i].floor=.none;
+                },
+                else =>{
+                    i-%=1;
+                }
+            }
+            i+%=1;
+        }
+        if (i<size-1) return error.ParseLevel;
         return Level{
             .sizeX = sizeX,
             .sizeY = sizeY,
@@ -130,29 +188,29 @@ pub const Level = struct{
 
     pub fn destroy(self: *Level) void{
         self.state.destroy(self.allocator);
-        //self.allocator.free(self.state.tile);
     }
 
     pub fn do(self: *Level, move: Move) !void {
         var next = try self.state.next(self.allocator);
-        var x: u8 = 0;
-        while (x<self.sizeX):(x+=1){
-            var y: u8 = 0;
-            while (y<self.sizeY):(y+=1){
-                if (self.at(x,y).?.object == .player){
-                    const dx:u8 = switch (move){
-                        .left => x-%1,
-                        .right => x+%1,
-                        else => x
-                    };
-                    const dy:u8 = switch (move){
-                        .up => y-%1,
-                        .down => y+%1,
-                        else => y
-                    };
-                    if (self.at(dx,dy)!=null and self.at(dx,dy).?.object!=.wall){
-                        next.tile[x+self.sizeX*y].object = .none;
-                        next.tile[dx+self.sizeX*dy].object = .player;
+        var xy = @Vector(2,u8){0,0};
+        while (xy[0]<self.sizeX):(xy[0]+=1){
+            xy[1] = 0;
+            while (xy[1]<self.sizeY):(xy[1]+=1){
+                if (self.at(xy).?.object == .player){
+                    var dxy = xy;
+                    while (self.isPushableAt(dxy)){
+                        dxy = move.addToVector(dxy);
+                    }
+                    if (self.isObjectAt(dxy,.none)){
+                        dxy = move.opposite().addToVector(xy);
+                        if (!self.isObjectAt(dxy,.box)) dxy = xy;
+                        var last = Object.none;
+                        while (self.isPushableAt(dxy)){
+                            next.tile[self.index(dxy)].object = last;
+                            last = self.state.tile[self.index(dxy)].object; 
+                            dxy = move.addToVector(dxy);                  
+                        }
+                        next.tile[self.index(dxy)].object = last;
                     }
                 }
             }
@@ -164,6 +222,13 @@ pub const Level = struct{
             _ = next.undo(self.allocator);
         }
         return;
+    }
+
+    pub fn solved(self: *Level) bool{
+        for (self.state.tile) |t|{
+            if (t.floor==.plate and t.object!=.box) return false;
+        }
+        return true;
     }
 
     pub fn undo(self: *Level) void {
@@ -182,17 +247,17 @@ pub const Level = struct{
         const offsetX = @divFloor(width - size*self.sizeX,2);
         const offsetY = @divFloor(height - size*self.sizeY,2);
 
-        var x: u8 = 0;
-        while (x<self.sizeX):(x+=1){
-            var y: u8 = 0;
-            while (y<self.sizeY):(y+=1){
+        var xy = @Vector(2,u8){0,0};
+        while (xy[0]<self.sizeX):(xy[0]+=1){
+            xy[1] = 0;
+            while (xy[1]<self.sizeY):(xy[1]+=1){
                 const r = c.SDL_Rect{
-                    .x = @intCast(c_int,offsetX+size*x),
-                    .y = @intCast(c_int,offsetY+size*y),
+                    .x = @intCast(c_int,offsetX+size*xy[0]),
+                    .y = @intCast(c_int,offsetY+size*xy[1]),
                     .w = @intCast(c_int,size),
                     .h = @intCast(c_int,size)
                 };
-                const color = self.at(x,y).?.color();
+                const color = self.at(xy).?.color();
                 _ = c.SDL_SetRenderDrawColor(
                     renderer,
                     @truncate(u8,color >> 24),
