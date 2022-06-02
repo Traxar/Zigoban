@@ -10,5 +10,5 @@ R to reset the current level.
 
 ## Made with
 
-'zig 0.10.0-dev.2431' and 'SDL2'.
+`zig 0.10.0-dev.2431` and `SDL2`.
 
