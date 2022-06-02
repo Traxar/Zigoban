@@ -193,20 +193,25 @@ pub const Level = struct{
     }
 
     pub fn do(self: *Level, move: Move) !void {
+        // create next state
         var next = try self.state.next(self.allocator);
         var xy = @Vector(2,u8){0,0};
         while (xy[0]<self.sizeX):(xy[0]+=1){
             xy[1] = 0;
             while (xy[1]<self.sizeY):(xy[1]+=1){
+                //find player
                 if (self.at(xy).?.object == .player){
+                    //check if player can move
                     var dxy = xy;
                     while (self.isPushableAt(dxy)){
                         dxy = move.addToVector(dxy);
                     }
                     if (self.isObjectAt(dxy,.none)){
+                        //find push start (pull)
                         dxy = move.opposite().addToVector(xy);
                         if (!self.isPushableAt(dxy)) dxy = xy;
                         var last = Object.none;
+                        //push
                         while (self.isPushableAt(dxy)){
                             next.tile[self.index(dxy)].object = last;
                             last = self.state.tile[self.index(dxy)].object; 
@@ -217,6 +222,7 @@ pub const Level = struct{
                 }
             }
         }
+        // only use the new state if something changed
         if (!self.state.isEqual(next)){
             self.state = next;
         }
