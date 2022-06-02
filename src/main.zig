@@ -1,7 +1,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 const l = @import("level.zig");
-const levels = @embedFile("levels.txt");
+const levels = @embedFile("../levels.txt");
 
 const WINDOW_WIDTH = 900;
 const WINDOW_HEIGHT = 600;
