@@ -145,8 +145,10 @@ pub const Level = struct{
         const sizeY = try std.fmt.parseInt(u8, reader.next() orelse return error.ParseLevel, 10);
         const data = reader.next() orelse return error.ParseLevel;
         var state = try allocator.create(State);
+        errdefer allocator.destroy(state);
         const size = sizeX*@intCast(u16,sizeY);
         state.tile = try allocator.alloc(Tile, size);
+        errdefer allocator.free(state.tile);
         state.prev = null;
         var i: u16 = 0;
         for (data) |d|{
@@ -177,7 +179,7 @@ pub const Level = struct{
             }
             i+%=1;
         }
-        if (i<size-1) return error.ParseLevel;
+        if (i<size) return error.ParseLevel;
         return Level{
             .sizeX = sizeX,
             .sizeY = sizeY,
@@ -203,7 +205,7 @@ pub const Level = struct{
                     }
                     if (self.isObjectAt(dxy,.none)){
                         dxy = move.opposite().addToVector(xy);
-                        if (!self.isObjectAt(dxy,.box)) dxy = xy;
+                        if (!self.isPushableAt(dxy)) dxy = xy;
                         var last = Object.none;
                         while (self.isPushableAt(dxy)){
                             next.tile[self.index(dxy)].object = last;

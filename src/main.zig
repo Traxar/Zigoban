@@ -60,10 +60,10 @@ pub fn main() anyerror!void {
                 c.SDL_QUIT => break :mainloop,
                 c.SDL_KEYDOWN => {
                         switch (sdl_event.key.keysym.sym){
-                            c.SDLK_w => move = .up,
-                            c.SDLK_a => move = .left,
-                            c.SDLK_s => move = .down,
-                            c.SDLK_d => move = .right,
+                            c.SDLK_w, c.SDLK_UP => move = .up,
+                            c.SDLK_a, c.SDLK_LEFT => move = .left,
+                            c.SDLK_s, c.SDLK_DOWN => move = .down,
+                            c.SDLK_d, c.SDLK_RIGHT => move = .right,
                             c.SDLK_u => level.undo(),
                             c.SDLK_r => level.reset(),
                             else => {}
