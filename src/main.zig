@@ -7,7 +7,7 @@ const WINDOW_WIDTH = 900;
 const WINDOW_HEIGHT = 600;
 
 pub fn main() anyerror!void {
-    //Allocator
+    //allocator
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
         const leaked = gpa.deinit();

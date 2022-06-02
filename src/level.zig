@@ -179,7 +179,7 @@ pub const Level = struct{
             }
             i+%=1;
         }
-        if (i<size) return error.ParseLevel;
+        if (i!=size) return error.ParseLevel;
         return Level{
             .sizeX = sizeX,
             .sizeY = sizeY,
