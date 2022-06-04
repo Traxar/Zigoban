@@ -198,28 +198,32 @@ pub const Level = struct{
         var xy = @Vector(2,u8){0,0};
         while (xy[0]<self.sizeX):(xy[0]+=1){
             xy[1] = 0;
-            while (xy[1]<self.sizeY):(xy[1]+=1){
+            tileloop: while (xy[1]<self.sizeY):(xy[1]+=1){
                 //find player
-                if (self.at(xy).?.object == .player){
-                    //check if player can move
-                    var dxy = xy;
-                    while (self.isPushableAt(dxy)){
-                        dxy = move.addToVector(dxy);
-                    }
-                    if (self.isObjectAt(dxy,.none)){
-                        //find push start (pull)
-                        dxy = move.opposite().addToVector(xy);
-                        if (!self.isPushableAt(dxy)) dxy = xy;
-                        var last = Object.none;
-                        //push
-                        while (self.isPushableAt(dxy)){
-                            next.tile[self.index(dxy)].object = last;
-                            last = self.state.tile[self.index(dxy)].object; 
-                            dxy = move.addToVector(dxy);                  
-                        }
-                        next.tile[self.index(dxy)].object = last;
-                    }
+                if (!self.isObjectAt(xy,.player)) continue: tileloop;
+                //check if player can move
+                var dxy = xy;
+                while (self.isPushableAt(dxy)){
+                    dxy = move.addToVector(dxy);
                 }
+                if (!self.isObjectAt(dxy,.none)) continue: tileloop;
+                //check if player gets pushed
+                dxy = xy;
+                while (self.isPushableAt(dxy)){
+                    dxy = move.opposite().addToVector(dxy);
+                    if (self.isObjectAt(dxy,.player)) continue: tileloop;
+                }
+                //find push start (pull)
+                dxy = move.opposite().addToVector(xy);
+                if (!self.isPushableAt(dxy)) dxy = xy;
+                //push
+                var last = Object.none;
+                while (self.isPushableAt(dxy)){
+                    next.tile[self.index(dxy)].object = last;
+                    last = self.state.tile[self.index(dxy)].object; 
+                    dxy = move.addToVector(dxy);                  
+                }
+                next.tile[self.index(dxy)].object = last;
             }
         }
         // only use the new state if something changed
