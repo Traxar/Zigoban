@@ -1,3 +1,3 @@
-usingnamespace @cImport({
-    @cInclude("SDL2/SDL.h");
+pub const c = @cImport({
+    @cInclude("SDL3/SDL.h");
 });

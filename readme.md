@@ -1,6 +1,7 @@
 # Zigoban
 
 a very minimalistic Sokoban puzzle game with a pull mechanic.
+Its main purpose is to server as a minimal viable SDL sample project.
 
 ## Controls
 
@@ -10,5 +11,4 @@ R to reset the current level.
 
 ## Made with
 
-`zig 0.10.0-dev.2431` and `SDL2`.
-
+`zig 0.14.0`.
